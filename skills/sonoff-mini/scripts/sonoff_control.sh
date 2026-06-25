@@ -1,240 +1,302 @@
 #!/usr/bin/env bash
+#
+# sonoff_control.sh — Control a Sonoff Mini in DIY mode via local HTTP API.
+#
+# Usage:
+#   bash sonoff_control.sh --ip 192.168.1.150 info
+#   bash sonoff_control.sh --ip 192.168.1.150 --name "Living Room" switch on
+#   bash sonoff_control.sh --ip 192.168.1.150 --name "Living Room" setup
+#   bash sonoff_control.sh info                          # reuses saved config
+#   bash sonoff_control.sh switch off                    # reuses saved config
+#
 
-# Get directory where the script is located to reference config.json
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_FILE="$SCRIPT_DIR/../config.json"
+set -euo pipefail
 
-# Helper to read values from JSON
-get_config_val() {
-    local KEY=$1
-    if command -v jq &> /dev/null; then
-        jq -r ".$KEY" "$CONFIG_FILE"
-    else
-        # Simple fallback using sed if jq is not installed
-        sed -n 's/.*"'"$KEY"'"\s*:\s*"\([^"]*\)".*/\1/p' "$CONFIG_FILE"
-    fi
-}
+# ── Config path ────────────────────────────────────────────
+# Prefer Hermes skill config directory; fallback to ~/.hermes/skills/sonoff-mini/
+HERMES_HOME="${HERMES_HOME:-$HOME/.hermes}"
+SKILL_CONFIG_DIR="${SKILL_CONFIG_DIR:-$HERMES_HOME/skills/sonoff-mini}"
+CONFIG_FILE="$SKILL_CONFIG_DIR/config.json"
 
-# Helper to print structured JSON error
+# ── Globals parsed from --flags ─────────────────────────────
+CLI_IP=""
+CLI_NAME=""
+
+# ── JSON helpers ────────────────────────────────────────────
+
 print_json_error() {
-    local MSG=$1
-    local DETAILS=$2
-    local ESCAPED_MSG
-    local ESCAPED_DETAILS
-    
-    ESCAPED_MSG=$(echo "$MSG" | sed 's/"/\\"/g')
-    
-    if [ -n "$DETAILS" ]; then
-        ESCAPED_DETAILS=$(echo "$DETAILS" | sed 's/"/\\"/g')
-        JSON="{\"status\":\"error\",\"message\":\"$ESCAPED_MSG\",\"details\":\"$ESCAPED_DETAILS\"}"
-    else
-        JSON="{\"status\":\"error\",\"message\":\"$ESCAPED_MSG\"}"
+    local msg="$1" details="${2:-}"
+    local escaped_msg details_part=""
+    escaped_msg=$(echo "$msg" | sed 's/"/\\"/g')
+    if [ -n "$details" ]; then
+        local escaped_details
+        escaped_details=$(echo "$details" | sed 's/"/\\"/g')
+        details_part=",\"details\":\"$escaped_details\""
     fi
-    
-    if command -v jq &> /dev/null; then
-        echo "$JSON" | jq .
+    local json="{\"status\":\"error\",\"message\":\"$escaped_msg\"$details_part}"
+    if command -v jq &>/dev/null; then
+        echo "$json" | jq .
     else
-        echo "$JSON"
+        echo "$json"
     fi
 }
 
-# Helper to print structured JSON success
 print_json_success() {
-    local ACTION=$1
-    local DATA=$2
-    local IP
-    local NAME
-    
-    IP=$(get_config_val "ip")
-    NAME=$(get_config_val "name")
-    
-    local JSON
-    if [ "$ACTION" = "info" ]; then
-        JSON="{\"status\":\"success\",\"device\":{\"name\":\"$NAME\",\"ip\":\"$IP\"},\"info\":$DATA}"
-    elif [ "$ACTION" = "switch" ]; then
-        JSON="{\"status\":\"success\",\"device\":{\"name\":\"$NAME\",\"ip\":\"$IP\"},\"action\":\"switch\",\"state\":\"$DATA\"}"
-    elif [ "$ACTION" = "setup" ]; then
-        JSON="{\"status\":\"success\",\"message\":\"Configuration saved successfully\",\"device\":{\"name\":\"$NAME\",\"ip\":\"$IP\"}}"
-    fi
-    
-    if command -v jq &> /dev/null; then
-        echo "$JSON" | jq .
+    local action="$1" data="$2" ip name
+    ip=$(get_config_val "ip")
+    name=$(get_config_val "name")
+
+    local json
+    case "$action" in
+        info)
+            json="{\"status\":\"success\",\"device\":{\"name\":\"$name\",\"ip\":\"$ip\"},\"info\":$data}"
+            ;;
+        switch)
+            json="{\"status\":\"success\",\"device\":{\"name\":\"$name\",\"ip\":\"$ip\"},\"action\":\"switch\",\"state\":\"$data\"}"
+            ;;
+        setup)
+            json="{\"status\":\"success\",\"message\":\"Configuration saved successfully\",\"device\":{\"name\":\"$name\",\"ip\":\"$ip\"}}"
+            ;;
+        *)
+            json="{\"status\":\"success\",\"device\":{\"name\":\"$name\",\"ip\":\"$ip\"}}"
+            ;;
+    esac
+    if command -v jq &>/dev/null; then
+        echo "$json" | jq .
     else
-        echo "$JSON"
+        echo "$json"
     fi
 }
 
-# Initial Configuration Flow (Interactive inputs are routed to stderr)
-run_setup() {
-    echo "==========================================================" >&2
-    echo "       SONOFF MINI SKILL INITIAL CONFIGURATION            " >&2
-    echo "==========================================================" >&2
-    echo "WARNING: This skill requires your Sonoff Mini to be" >&2
-    echo "configured in DIY (Do-It-Yourself) mode and connected to" >&2
-    echo "the same local network as this computer." >&2
-    echo "----------------------------------------------------------" >&2
-    echo >&2
-    
-    echo -n "Enter your Sonoff Mini's IP address (e.g., 192.168.1.150): " >&2
-    read IP
-    if [ -z "$IP" ]; then
-        print_json_error "IP address cannot be empty."
-        exit 1
+# ── Config file read helpers ───────────────────────────────
+
+get_config_val() {
+    local key="$1"
+    if [ ! -f "$CONFIG_FILE" ]; then echo ""; return; fi
+    if command -v jq &>/dev/null; then
+        jq -r ".$key // empty" "$CONFIG_FILE"
+    else
+        sed -n 's/.*"'"$key"'"\s*:\s*"\([^"]*\)".*/\1/p' "$CONFIG_FILE"
     fi
-    
-    echo -n "Enter a name to identify the device (e.g., Living Room Light): " >&2
-    read NAME
-    if [ -z "$NAME" ]; then
-        NAME="Sonoff Mini"
-    fi
-    
-    echo >&2
-    echo "Validating connection and DIY mode with $IP..." >&2
-    
-    # Test connection to the Sonoff Mini in DIY mode
-    RESPONSE=$(curl -s -X POST -H "Content-Type: application/json" \
-         -d '{"deviceid": "", "data": {}}' \
-         --connect-timeout 5 \
-         "http://${IP}:8081/zeroconf/info")
-         
-    CURL_STATUS=$?
-    
-    if [ $CURL_STATUS -ne 0 ] || [ -z "$RESPONSE" ]; then
-        echo "----------------------------------------------------------" >&2
-        echo "CONNECTION ERROR: Could not reach the Sonoff Mini." >&2
-        echo "----------------------------------------------------------" >&2
-        print_json_error "Could not reach the Sonoff Mini." "Verify IP, power, DIY mode, and network connection."
-        exit 1
-    fi
-    
-    # Create configuration json file
-    cat <<EOF > "$CONFIG_FILE"
+}
+
+save_config() {
+    local ip="$1" name="$2"
+    mkdir -p "$SKILL_CONFIG_DIR"
+    cat > "$CONFIG_FILE" <<EOF
 {
-  "ip": "$IP",
-  "name": "$NAME"
+  "ip": "$ip",
+  "name": "$name"
 }
 EOF
-    echo "----------------------------------------------------------" >&2
-    echo "Configuration successfully saved." >&2
-    echo "----------------------------------------------------------" >&2
-    echo >&2
-    
+    echo "Configuration saved to $CONFIG_FILE" >&2
+}
+
+validate_device() {
+    local ip="$1"
+    local response
+    response=$(curl -s -X POST -H "Content-Type: application/json" \
+        -d '{"deviceid": "", "data": {}}' \
+        --connect-timeout 5 \
+        "http://${ip}:8081/zeroconf/info" 2>/dev/null) || true
+    if [ -z "$response" ]; then
+        print_json_error \
+            "Could not reach the Sonoff Mini." \
+            "Verify IP, power, DIY mode, and network connection."
+        exit 1
+    fi
+    echo "$response"
+}
+
+# ── Resolve IP+Name: from --flags or saved config ──────────
+
+resolve_device() {
+    # If --ip was passed, save config unconditionally
+    if [ -n "$CLI_IP" ]; then
+        local name="${CLI_NAME:-Sonoff Mini}"
+        validate_device "$CLI_IP" >/dev/null
+        save_config "$CLI_IP" "$name"
+        return
+    fi
+
+    # Try saved config
+    if [ ! -f "$CONFIG_FILE" ]; then
+        print_json_error \
+            "Configuration file not found." \
+            "Pass --ip <address> [--name <label>] before the command, or run \`setup\`."
+        exit 1
+    fi
+
+    local saved_ip
+    saved_ip=$(get_config_val "ip")
+    if [ -z "$saved_ip" ]; then
+        print_json_error \
+            "Configuration file is corrupted." \
+            "Remove $CONFIG_FILE and run with --ip again."
+        exit 1
+    fi
+}
+
+# ── Commands ────────────────────────────────────────────────
+
+cmd_info() {
+    local ip name
+    ip=$(get_config_val "ip")
+    name=$(get_config_val "name")
+
+    local response
+    response=$(curl -s -X POST -H "Content-Type: application/json" \
+        -d '{"deviceid": "", "data": {}}' \
+        "http://${ip}:8081/zeroconf/info") || true
+
+    if [ -z "$response" ]; then
+        print_json_error "Could not retrieve info from device $name ($ip)." "Empty response from device."
+        exit 1
+    fi
+
+    local data_part
+    if command -v jq &>/dev/null; then
+        data_part=$(echo "$response" | jq -c '.data // .')
+    else
+        data_part=$(echo "$response" | sed -n 's/.*"data"\s*:\s*\({[^}]*}\).*/\1/p')
+        [ -z "$data_part" ] && data_part="$response"
+    fi
+
+    print_json_success "info" "$data_part"
+}
+
+cmd_switch() {
+    local state="$1"
+    if [ "$state" != "on" ] && [ "$state" != "off" ]; then
+        print_json_error "Invalid state '$state'. Use 'on' or 'off'."
+        exit 1
+    fi
+
+    local ip name
+    ip=$(get_config_val "ip")
+    name=$(get_config_val "name")
+
+    local response
+    response=$(curl -s -X POST -H "Content-Type: application/json" \
+        -d "{\"deviceid\": \"\", \"data\": {\"switch\": \"$state\"}}" \
+        "http://${ip}:8081/zeroconf/switch") || true
+
+    if [ -z "$response" ]; then
+        print_json_error "Failed to send command to device $name ($ip)." "Empty response from device."
+        exit 1
+    fi
+
+    local err_code
+    if command -v jq &>/dev/null; then
+        err_code=$(echo "$response" | jq '.error // -1')
+    else
+        err_code=$(echo "$response" | sed -n 's/.*"error"\s*:\s*\([0-9]*\).*/\1/p')
+        [ -z "$err_code" ] && err_code=-1
+    fi
+
+    if [ "$err_code" = "0" ]; then
+        print_json_success "switch" "$state"
+    else
+        print_json_error "Device returned an error." "Code: $err_code, Response: $response"
+        exit 1
+    fi
+}
+
+cmd_setup() {
+    local ip="${CLI_IP:-}"
+    local name="${CLI_NAME:-}"
+
+    if [ -z "$ip" ]; then
+        print_json_error \
+            "IP address is required." \
+            "Usage: bash sonoff_control.sh --ip <address> [--name <label>] setup"
+        exit 1
+    fi
+    [ -z "$name" ] && name="Sonoff Mini"
+
+    validate_device "$ip" >/dev/null
+    save_config "$ip" "$name"
     print_json_success "setup"
 }
 
-# Load configuration file and trigger setup if necessary
-load_config() {
-    if [ ! -f "$CONFIG_FILE" ]; then
-        run_setup
-    fi
-    
-    IP=$(get_config_val "ip")
-    NAME=$(get_config_val "name")
-    
-    if [ -z "$IP" ]; then
-        echo "Invalid configuration found. Restarting setup..." >&2
-        run_setup
-        IP=$(get_config_val "ip")
-        NAME=$(get_config_val "name")
-    fi
-}
+# ── Usage / help ────────────────────────────────────────────
 
-# Get device info
-get_info() {
-    local RESPONSE
-    RESPONSE=$(curl -s -X POST -H "Content-Type: application/json" \
-         -d '{"deviceid": "", "data": {}}' \
-         "http://${IP}:8081/zeroconf/info")
-         
-    if [ -z "$RESPONSE" ]; then
-        print_json_error "Could not retrieve info from device $NAME ($IP)." "Empty response from device."
-        exit 1
-    fi
-    
-    local DATA_PART
-    if command -v jq &> /dev/null; then
-        DATA_PART=$(echo "$RESPONSE" | jq -c '.data')
-    else
-        # Simple extraction of the data JSON object using sed if jq is not present
-        DATA_PART=$(echo "$RESPONSE" | sed -n 's/.*"data"\s*:\s*\({[^}]*}\).*/\1/p')
-        if [ -z "$DATA_PART" ]; then
-            DATA_PART="$RESPONSE"
-        fi
-    fi
-    
-    print_json_success "info" "$DATA_PART"
-}
-
-# Change switch state (on/off)
-set_switch() {
-    local STATE=$1
-    if [ "$STATE" != "on" ] && [ "$STATE" != "off" ]; then
-        print_json_error "Invalid state '$STATE'. Use 'on' or 'off'."
-        exit 1
-    fi
-    
-    local RESPONSE
-    RESPONSE=$(curl -s -X POST -H "Content-Type: application/json" \
-         -d "{\"deviceid\": \"\", \"data\": {\"switch\": \"$STATE\"}}" \
-         "http://${IP}:8081/zeroconf/switch")
-         
-    if [ -z "$RESPONSE" ]; then
-        print_json_error "Failed to send command to device $NAME ($IP)." "Empty response from device."
-        exit 1
-    fi
-    
-    # Check if Sonoff returned success (error 0)
-    local ERR_CODE
-    if command -v jq &> /dev/null; then
-        ERR_CODE=$(echo "$RESPONSE" | jq '.error')
-    else
-        ERR_CODE=$(echo "$RESPONSE" | sed -n 's/.*"error"\s*:\s*\([0-9]*\).*/\1/p')
-    fi
-    
-    if [ "$ERR_CODE" = "0" ]; then
-        print_json_success "switch" "$STATE"
-    else
-        print_json_error "Device returned an error." "Code: $ERR_CODE, Response: $RESPONSE"
-        exit 1
-    fi
-}
-
-# JSON Usage document
 show_usage() {
-    local USAGE_JSON='{
-  "status": "error",
-  "message": "Invalid command or usage.",
-  "usage": {
-    "command": "./sonoff_control.sh <action> [arguments]",
-    "actions": {
-      "info": "Returns device information in JSON",
-      "switch <on|off>": "Turns the device on or off",
-      "setup": "Forces reconfiguration of the skill"
-    }
-  }
-}'
-    if command -v jq &> /dev/null; then
-        echo "$USAGE_JSON" | jq .
-    else
-        echo "$USAGE_JSON"
-    fi
+    cat >&2 <<'EOF'
+sonoff_control.sh — Control a Sonoff Mini in DIY mode
+
+Usage:
+  bash sonoff_control.sh [--ip <addr>] [--name <label>] <command> [args]
+
+Flags:
+  --ip <address>     Sonoff Mini IP (e.g. 192.168.1.150)
+  --name <label>     Friendly name (e.g. "Living Room Light")
+                     Saved to config after first successful use.
+
+Commands:
+  info               Get device info and status
+  switch on|off      Turn the relay on or off
+  setup              Force reconfiguration (requires --ip)
+  --help             Show this message
+
+Examples:
+  bash sonoff_control.sh --ip 192.168.1.150 --name "Living Room" info
+  bash sonoff_control.sh switch on
+  bash sonoff_control.sh --ip 192.168.1.150 setup
+EOF
 }
 
-# Entry point
-case "$1" in
+# ── Argument parsing ────────────────────────────────────────
+
+# Consume --flags before the positional command
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --ip)
+            CLI_IP="$2"
+            shift 2
+            ;;
+        --name)
+            CLI_NAME="$2"
+            shift 2
+            ;;
+        --help|-h)
+            show_usage
+            exit 0
+            ;;
+        --*)
+            print_json_error "Unknown flag: $1" "See --help for usage."
+            exit 1
+            ;;
+        *)
+            # First positional argument = command
+            break
+            ;;
+    esac
+done
+
+COMMAND="${1:-}"
+shift || true
+
+# ── Dispatch ────────────────────────────────────────────────
+
+case "$COMMAND" in
     info)
-        load_config
-        get_info
+        resolve_device
+        cmd_info
         ;;
     switch)
-        load_config
-        set_switch "$2"
+        resolve_device
+        cmd_switch "${1:-}"
         ;;
     setup)
-        run_setup
+        cmd_setup
+        ;;
+    --help|-h|"")
+        show_usage
+        exit 0
         ;;
     *)
-        show_usage
+        print_json_error "Unknown command: $COMMAND" "See --help for usage."
         exit 1
         ;;
 esac

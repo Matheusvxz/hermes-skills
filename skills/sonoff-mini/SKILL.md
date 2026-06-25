@@ -1,102 +1,77 @@
 ---
 name: sonoff-mini
-description: Control and retrieve status of a Sonoff Mini smart switch in DIY mode on the local network. Use this skill when you need to turn the device on/off or check its current power state and connection info.
+description: Control Sonoff Mini smart switches in DIY mode locally.
+author: Matheusvxz
+version: 2.0.0
 license: MIT
-version: 1.0.0
+supporting_files:
+  scripts:
+    - sonoff_control.sh — Main control script (info, switch on/off, setup)
+    - list_devices.sh — List all configured Sonoff Mini devices
+  references:
+    - api-contract.md — JSON output schema for all commands
 metadata:
   hermes:
     category: home-automation
-    tags: [sonoff, IoT, home-automation, bash]
+    tags: [sonoff, iot, home-automation, bash, smart-switch]
+    related_skills: [embedded-lab]
 ---
 
-# Sonoff Mini DIY Mode Skill
+# Sonoff Mini DIY Mode
 
-This skill allows the agent to communicate with a Sonoff Mini device running in DIY mode on the local network. All command outputs are returned as structured JSON.
+Control and retrieve status of a Sonoff Mini smart switch running in DIY mode on the local network via HTTP POST requests.
 
-## Prerequisite: DIY Mode
-The Sonoff Mini must be configured in DIY mode and connected to the same local network. If the device is connected to the eWeLink app or cloud, the local HTTP API will not be active.
+## When to Use
+Use this skill when you need to:
+- Turn a Sonoff Mini smart switch ON or OFF.
+- Check the current power state, startup behavior, or signal strength (RSSI) of a device.
+- List all configured Sonoff Mini devices on the local network.
+- Configure or update the local IP/name of a Sonoff Mini device.
 
-## Configuration
-On the first execution of the controller script, it checks for a `config.json` file. If not found or empty, the script will:
-1. Explain that the Sonoff Mini must be in DIY mode.
-2. Prompt for the device's IP address.
-3. Prompt for the device's name.
-4. Perform an HTTP POST to `http://<IP>:8081/zeroconf/info` to check if DIY mode is active.
-5. If active, save these configurations to `config.json` inside the skill directory.
+Do NOT use this skill if the device is connected to the eWeLink cloud or is not configured in DIY mode (listening on local network port 8081).
 
-*Note: All interactive prompts and warnings are outputted to `stderr`, while the final setup result is printed as structured JSON to `stdout`.*
+## Quick Reference
+| Action | Command | Expected Output |
+| --- | --- | --- |
+| Get Device Info | `bash sonoff_control.sh --ip <ip> info` | JSON with relay status, startup behavior, RSSI |
+| Turn ON Switch | `bash sonoff_control.sh switch on` | JSON confirming relay is `on` |
+| Turn OFF Switch | `bash sonoff_control.sh switch off` | JSON confirming relay is `off` |
+| List Devices | `bash list_devices.sh` | JSON array of all configured devices |
 
-## Usage
-Run the controller script inside `${HERMES_SKILL_DIR}/scripts/sonoff_control.sh`:
+## Procedure
+To execute Sonoff Mini controls, follow these steps using the `terminal` tool:
 
-- **Get Device Info:**
-  ```bash
-  bash ${HERMES_SKILL_DIR}/scripts/sonoff_control.sh info
-  ```
-  Returns a JSON containing the current switch status, signal strength (RSSI), and device details.
-  Example output:
-  ```json
-  {
-    "status": "success",
-    "device": {
-      "name": "Living Room Light",
-      "ip": "192.168.1.150"
-    },
-    "info": {
-      "switch": "off",
-      "startup": "stay",
-      "rssi": -55
-    }
-  }
-  ```
+1. **Hermes Sandbox Script Materialization (Docker/Modal backends):**
+   - Since the Docker container or remote sandbox does not automatically see host skill files, you must materialize the scripts into the active workspace before running them:
+     ```bash
+     mkdir -p /workspace/.hermes/skills/sonoff-mini/scripts
+     # The agent loads script contents via skill_view and writes them to the workspace path above
+     ```
+   - For all subsequent executions, run commands from the materialized path (e.g., `bash /workspace/.hermes/skills/sonoff-mini/scripts/sonoff_control.sh`).
 
-- **Turn ON the Switch:**
-  ```bash
-  bash ${HERMES_SKILL_DIR}/scripts/sonoff_control.sh switch on
-  ```
-  Example output:
-  ```json
-  {
-    "status": "success",
-    "device": {
-      "name": "Living Room Light",
-      "ip": "192.168.1.150"
-    },
-    "action": "switch",
-    "state": "on"
-  }
-  ```
+2. **Initial Configuration:**
+   - Supply the device IP and name on the first invocation to auto-save the configuration:
+     ```bash
+     bash sonoff_control.sh --ip 192.168.1.150 --name "Living Room Light" info
+     ```
+   - To force reconfiguration:
+     ```bash
+     bash sonoff_control.sh --ip 192.168.1.150 --name "Living Room Light" setup
+     ```
 
-- **Turn OFF the Switch:**
-  ```bash
-  bash ${HERMES_SKILL_DIR}/scripts/sonoff_control.sh switch off
-  ```
+3. **General Control Commands:**
+   - **Info:** `bash sonoff_control.sh info` (reuses saved configuration).
+   - **Relay Control:** `bash sonoff_control.sh switch on` or `bash sonoff_control.sh switch off`.
+   - **List Configured Devices:** `bash list_devices.sh`.
 
-- **List Configured Devices:**
-  ```bash
-  bash ${HERMES_SKILL_DIR}/scripts/list_devices.sh
-  ```
-  Returns a JSON list of all devices stored in the configuration file.
-  Example output:
-  ```json
-  {
-    "status": "success",
-    "devices": [
-      {
-        "name": "Living Room Light",
-        "ip": "192.168.1.150"
-      }
-    ]
-  }
-  ```
+## Pitfalls
+- **DIY Mode Inactive:** If the physical relay is connected to the eWeLink cloud, the local HTTP API (port 8081) is disabled. Press and hold the physical button on the switch for 5 seconds to toggle DIY mode.
+- **Docker Sandbox Network Limits:** The terminal sandbox running inside Docker might not reach local LAN IP addresses (like `192.168.x.x`). If command queries time out, you must execute the scripts directly on the host machine.
+- **Dependency Fallback:** If `jq` is not installed, scripts fall back to `sed` for parsing, but output validation is more robust when `jq` is present.
+- **Missing Materialization:** Failing to copy the scripts to `/workspace` before invoking them inside a Docker backend will cause `No such file or directory` errors.
 
-- **JSON Error Output:**
-  If a connection or execution error occurs, the script returns a structured JSON error to `stdout` (exit code 1).
-  Example output:
-  ```json
-  {
-    "status": "error",
-    "message": "Could not reach the Sonoff Mini.",
-    "details": "Verify IP, power, DIY mode, and network connection."
-  }
-  ```
+## Verification
+Validate that commands executed successfully by checking the stdout JSON response:
+- A successful command returns `"status": "success"` and the corresponding action details.
+- To verify a switch state change, ensure `"state"` matches your target command (`"on"` or `"off"`).
+- All command schemas are strictly defined in `references/api-contract.md`.

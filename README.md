@@ -1,12 +1,10 @@
 # Hermes Skills
 
-This repository contains a collection of modular skills designed for AI agents, following the [agentskills.io](https://agentskills.io) specification.
+This repository contains a collection of modular skills designed for AI agents, following the [agentskills.io](https://agentskills.io) specification. Compatible with **Hermes Agent**, **Claude Code**, **Codex CLI**, and other agent frameworks that support SKILL.md.
 
 ## Repository Structure
 
-The repository is modularly structured, allowing each skill to reside in its own directory inside the `skills/` folder, alongside general-purpose utility scripts at the root level.
-
-```
+```text
 hermes-skills/
 ├── README.md
 ├── scripts/                 # General repository scripts
@@ -17,6 +15,7 @@ hermes-skills/
     └── <skill-name>/
         ├── SKILL.md                 # Agent-facing metadata and documentation
         ├── config.json              # Local configurations (created during setup)
+        ├── references/              # Supporting documentation
         └── scripts/                 # Executable scripts for the skill
 ```
 
@@ -24,20 +23,37 @@ hermes-skills/
 
 ## Installation
 
-### One-Liner Web Installer (Recommended)
-You can install all skills in a single command without cloning the repository manually. This fetches the script and clones the `main` branch into a temporary directory to perform the install:
+### Hermes Agent
+
+```bash
+# Option 1: Add this repo as a tap (full skill catalog)
+hermes skills tap add https://github.com/Matheusvxz/hermes-skills
+
+# Option 2: Install a single skill by SKILL.md URL
+hermes skills install \
+  https://raw.githubusercontent.com/Matheusvxz/hermes-skills/main/skills/sonoff-mini/SKILL.md
+
+# Option 3: Check installed skills
+hermes skills list
+```
+
+After installation, reload skills in the current session: `/reload-skills` (slash command) or start a new session.
+
+> **Important for terminal sandboxes (Hermes Docker backend):** skills scripts live on the host, not inside the sandbox. The agent must materialize them before execution. See the "Hermes sandbox execution" section inside each skill's `SKILL.md`.
+
+### One-Liner Web Installer (Claude Code / general)
 
 ```bash
 curl -sL https://raw.githubusercontent.com/Matheusvxz/hermes-skills/main/scripts/raw.sh | bash -s -- -folder ~/.claude/skills
 ```
 
 To force-overwrite any existing skill folders:
+
 ```bash
 curl -sL https://raw.githubusercontent.com/Matheusvxz/hermes-skills/main/scripts/raw.sh | bash -s -- -folder ~/.claude/skills -force
 ```
 
 ### Manual Installation
-If you have already cloned the repository, you can run the installer script directly:
 
 ```bash
 # Normal interactive execution
@@ -55,7 +71,6 @@ If you have already cloned the repository, you can run the installer script dire
 ## General Scripts
 
 ### Repository Update (`scripts/update.sh`)
-Executes `git pull` to fetch the latest commits from the remote repository.
 
 ```bash
 ./scripts/update.sh
@@ -66,40 +81,54 @@ Executes `git pull` to fetch the latest commits from the remote repository.
 ## Available Skills
 
 ### 1. Sonoff Mini DIY Mode (`skills/sonoff-mini`)
-Enables control and status retrieval of a Sonoff Mini smart switch configured in DIY mode on the local network. 
+
+Enables control and status retrieval of a Sonoff Mini smart switch configured in DIY mode on the local network.
 
 **All outputs to `stdout` are formatted as structured JSON.**
 
 #### Prerequisites
+
 - A Sonoff Mini device connected to the local network and configured in **DIY Mode** (listening on port 8081).
 - `curl` and `jq` installed on the system.
 
-#### Usage & Initial Setup
-On the first execution of any command, the control script validates connection to the local device and prompts for its IP address and name. These values are saved to `config.json` inside the skill's folder.
+#### Usage
 
-*Note: All interactive configuration prompts are outputted to `stderr` to avoid polluting the JSON stdout parser.*
+Supply the device IP on first use. Config auto-saves for subsequent calls:
 
-##### Get device info/status:
 ```bash
+# First use — specify IP and name
+./skills/sonoff-mini/scripts/sonoff_control.sh --ip 192.168.1.150 --name "Living Room" info
+
+# Later calls — saved config is reused
 ./skills/sonoff-mini/scripts/sonoff_control.sh info
 ```
 
+##### Get device info/status:
+
+```bash
+./skills/sonoff-mini/scripts/sonoff_control.sh --ip 192.168.1.150 info
+```
+
 ##### Turn switch ON:
+
 ```bash
 ./skills/sonoff-mini/scripts/sonoff_control.sh switch on
 ```
 
 ##### Turn switch OFF:
+
 ```bash
 ./skills/sonoff-mini/scripts/sonoff_control.sh switch off
 ```
 
 ##### List configured devices:
+
 ```bash
 ./skills/sonoff-mini/scripts/list_devices.sh
 ```
 
 ##### Force setup reconfiguration:
+
 ```bash
-./skills/sonoff-mini/scripts/sonoff_control.sh setup
+./skills/sonoff-mini/scripts/sonoff_control.sh --ip 192.168.1.150 --name "Living Room" setup
 ```

@@ -1,50 +1,45 @@
 #!/usr/bin/env bash
+#
+# list_devices.sh — List all Sonoff Mini devices stored in the Hermes skill config.
+# Reads config from ~/.hermes/skills/sonoff-mini/config.json
+#
 
-# Get directory where the script is located to reference config.json
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_FILE="$SCRIPT_DIR/../config.json"
+set -euo pipefail
 
-# Helper to print structured JSON error
+HERMES_HOME="${HERMES_HOME:-$HOME/.hermes}"
+SKILL_CONFIG_DIR="${SKILL_CONFIG_DIR:-$HERMES_HOME/skills/sonoff-mini}"
+CONFIG_FILE="$SKILL_CONFIG_DIR/config.json"
+
 print_json_error() {
-    local MSG=$1
-    local DETAILS=$2
-    local JSON
-    
-    local ESCAPED_MSG=$(echo "$MSG" | sed 's/"/\\"/g')
-    
-    if [ -n "$DETAILS" ]; then
-        local ESCAPED_DETAILS=$(echo "$DETAILS" | sed 's/"/\\"/g')
-        JSON="{\"status\":\"error\",\"message\":\"$ESCAPED_MSG\",\"details\":\"$ESCAPED_DETAILS\"}"
-    else
-        JSON="{\"status\":\"error\",\"message\":\"$ESCAPED_MSG\"}"
+    local msg="$1" details="${2:-}"
+    local escaped_msg details_part=""
+    escaped_msg=$(echo "$msg" | sed 's/"/\\"/g')
+    if [ -n "$details" ]; then
+        local escaped_details
+        escaped_details=$(echo "$details" | sed 's/"/\\"/g')
+        details_part=",\"details\":\"$escaped_details\""
     fi
-    
-    if command -v jq &> /dev/null; then
-        echo "$JSON" | jq .
+    local json="{\"status\":\"error\",\"message\":\"$escaped_msg\"$details_part}"
+    if command -v jq &>/dev/null; then
+        echo "$json" | jq .
     else
-        echo "$JSON"
+        echo "$json"
     fi
 }
 
-# Check if config file exists
 if [ ! -f "$CONFIG_FILE" ]; then
-    print_json_error "Configuration file not found." "Please run the sonoff_control.sh setup script first."
+    print_json_error "Configuration file not found." "Please run sonoff_control.sh with --ip first."
     exit 1
 fi
 
-# Output the devices list
-if command -v jq &> /dev/null; then
-    # Elegant filter checking if a devices array exists, otherwise wrap single device in an array
-    jq '{status: "success", devices: (if .devices then .devices else [{"name": .name, "ip": .ip}] end)}' "$CONFIG_FILE"
+if command -v jq &>/dev/null; then
+    jq '{status: "success", devices: (if .devices then .devices else [{name: .name, ip: .ip}] end)}' "$CONFIG_FILE"
 else
-    # Simple fallback using sed
-    IP=$(sed -n 's/.*"ip"\s*:\s*"\([^"]*\)".*/\1/p' "$CONFIG_FILE")
-    NAME=$(sed -n 's/.*"name"\s*:\s*"\([^"]*\)".*/\1/p' "$CONFIG_FILE")
-    
-    if [ -z "$IP" ] || [ -z "$NAME" ]; then
+    ip=$(sed -n 's/.*"ip"\s*:\s*"\([^"]*\)".*/\1/p' "$CONFIG_FILE")
+    name=$(sed -n 's/.*"name"\s*:\s*"\([^"]*\)".*/\1/p' "$CONFIG_FILE")
+    if [ -z "$ip" ] || [ -z "$name" ]; then
         print_json_error "Invalid configuration file format."
         exit 1
     fi
-    
-    echo "{\"status\":\"success\",\"devices\":[{\"name\":\"$NAME\",\"ip\":\"$IP\"}]}"
+    echo "{\"status\":\"success\",\"devices\":[{\"name\":\"$name\",\"ip\":\"$ip\"}]}"
 fi
