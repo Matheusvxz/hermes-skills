@@ -94,6 +94,11 @@ On the first execution of any command, the control script validates connection t
 ./skills/sonoff-mini/scripts/sonoff_control.sh switch off
 ```
 
+##### List configured devices:
+```bash
+./skills/sonoff-mini/scripts/list_devices.sh
+```
+
 ##### Force setup reconfiguration:
 ```bash
 ./skills/sonoff-mini/scripts/sonoff_control.sh setup

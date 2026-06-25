@@ -68,6 +68,24 @@ Run the controller script inside `scripts/sonoff_control.sh`:
   ./scripts/sonoff_control.sh switch off
   ```
 
+- **List Configured Devices:**
+  ```bash
+  ./scripts/list_devices.sh
+  ```
+  Returns a JSON list of all devices stored in the configuration file.
+  Example output:
+  ```json
+  {
+    "status": "success",
+    "devices": [
+      {
+        "name": "Living Room Light",
+        "ip": "192.168.1.150"
+      }
+    ]
+  }
+  ```
+
 - **JSON Error Output:**
   If a connection or execution error occurs, the script returns a structured JSON error to `stdout` (exit code 1).
   Example output:
