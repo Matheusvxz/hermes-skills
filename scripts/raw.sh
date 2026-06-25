@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Hermes Skills Web Installer (raw.sh)
-# Usage: curl -sL https://raw.githubusercontent.com/Matheusvxz/hermes-skills/main/scripts/raw.sh | bash -- -folder ~/.claude/skills
+# Usage: curl -sL https://raw.githubusercontent.com/Matheusvxz/hermes-skills/main/scripts/raw.sh | bash -s -- -folder ~/.claude/skills
 
 FOLDER=""
 FORCE=false

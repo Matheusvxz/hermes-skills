@@ -28,12 +28,12 @@ hermes-skills/
 You can install all skills in a single command without cloning the repository manually. This fetches the script and clones the `main` branch into a temporary directory to perform the install:
 
 ```bash
-curl -sL https://raw.githubusercontent.com/Matheusvxz/hermes-skills/main/scripts/raw.sh | bash -- -folder ~/.claude/skills
+curl -sL https://raw.githubusercontent.com/Matheusvxz/hermes-skills/main/scripts/raw.sh | bash -s -- -folder ~/.claude/skills
 ```
 
 To force-overwrite any existing skill folders:
 ```bash
-curl -sL https://raw.githubusercontent.com/Matheusvxz/hermes-skills/main/scripts/raw.sh | bash -- -folder ~/.claude/skills -force
+curl -sL https://raw.githubusercontent.com/Matheusvxz/hermes-skills/main/scripts/raw.sh | bash -s -- -folder ~/.claude/skills -force
 ```
 
 ### Manual Installation
