@@ -1,0 +1,19 @@
+[
+  {
+    "name": "resumo-pt-br",
+    "input": {
+      "text": "A equipe Hermes publicou um novo template de skills com padronização de metadata, schemas e exemplos para acelerar a criação de novas skills.",
+      "language": "pt-BR",
+      "max_sentences": 2
+    },
+    "expected_output": {
+      "summary": "A equipe Hermes lançou um template padronizado para acelerar a criação de skills. O modelo inclui metadata, schemas e exemplos.",
+      "language": "pt-BR",
+      "highlights": [
+        "Template padronizado",
+        "Maior velocidade de criação",
+        "Inclui metadata e schemas"
+      ]
+    }
+  }
+]

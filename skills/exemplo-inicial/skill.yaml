@@ -1,0 +1,12 @@
+id: exemplo-inicial
+name: Exemplo Inicial Hermes
+version: 1.0.0
+description: Skill de exemplo para resumir textos de forma objetiva.
+owner: hermes-team
+entrypoint: prompt.md
+input_schema: input.schema.json
+output_schema: output.schema.json
+tags:
+  - template
+  - exemplo
+  - resumo

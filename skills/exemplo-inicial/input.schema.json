@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ResumoInput",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["text", "language"],
+  "properties": {
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Texto a ser resumido."
+    },
+    "language": {
+      "type": "string",
+      "enum": ["pt-BR", "en-US", "es-ES"],
+      "description": "Idioma esperado para a resposta."
+    },
+    "max_sentences": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10,
+      "default": 3,
+      "description": "Número máximo de frases no resumo."
+    }
+  }
+}
