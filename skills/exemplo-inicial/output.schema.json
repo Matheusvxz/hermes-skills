@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ResumoOutput",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["summary", "language", "highlights"],
+  "properties": {
+    "summary": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Resumo final do conteúdo."
+    },
+    "language": {
+      "type": "string",
+      "description": "Idioma da resposta."
+    },
+    "highlights": {
+      "type": "array",
+      "description": "Pontos principais identificados.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1
+    },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {
+        "code": { "type": "string" },
+        "message": { "type": "string" }
+      }
+    }
+  }
+}
