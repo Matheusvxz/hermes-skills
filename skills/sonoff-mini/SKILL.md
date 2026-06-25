@@ -2,7 +2,11 @@
 name: sonoff-mini
 description: Control and retrieve status of a Sonoff Mini smart switch in DIY mode on the local network. Use this skill when you need to turn the device on/off or check its current power state and connection info.
 license: MIT
-compatibility: Local network access, Bash, curl, jq
+version: 1.0.0
+metadata:
+  hermes:
+    category: home-automation
+    tags: [sonoff, IoT, home-automation, bash]
 ---
 
 # Sonoff Mini DIY Mode Skill
@@ -23,11 +27,11 @@ On the first execution of the controller script, it checks for a `config.json` f
 *Note: All interactive prompts and warnings are outputted to `stderr`, while the final setup result is printed as structured JSON to `stdout`.*
 
 ## Usage
-Run the controller script inside `scripts/sonoff_control.sh`:
+Run the controller script inside `${HERMES_SKILL_DIR}/scripts/sonoff_control.sh`:
 
 - **Get Device Info:**
   ```bash
-  ./scripts/sonoff_control.sh info
+  bash ${HERMES_SKILL_DIR}/scripts/sonoff_control.sh info
   ```
   Returns a JSON containing the current switch status, signal strength (RSSI), and device details.
   Example output:
@@ -48,7 +52,7 @@ Run the controller script inside `scripts/sonoff_control.sh`:
 
 - **Turn ON the Switch:**
   ```bash
-  ./scripts/sonoff_control.sh switch on
+  bash ${HERMES_SKILL_DIR}/scripts/sonoff_control.sh switch on
   ```
   Example output:
   ```json
@@ -65,12 +69,12 @@ Run the controller script inside `scripts/sonoff_control.sh`:
 
 - **Turn OFF the Switch:**
   ```bash
-  ./scripts/sonoff_control.sh switch off
+  bash ${HERMES_SKILL_DIR}/scripts/sonoff_control.sh switch off
   ```
 
 - **List Configured Devices:**
   ```bash
-  ./scripts/list_devices.sh
+  bash ${HERMES_SKILL_DIR}/scripts/list_devices.sh
   ```
   Returns a JSON list of all devices stored in the configuration file.
   Example output:

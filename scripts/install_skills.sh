@@ -16,6 +16,21 @@ show_help() {
     echo
 }
 
+# Helper function to extract skill category from SKILL.md
+get_skill_category() {
+    local skill_path="$1"
+    local skill_md="$skill_path/SKILL.md"
+    local category="default"
+    if [ -f "$skill_md" ]; then
+        local parsed_cat
+        parsed_cat=$(grep -A 5 "hermes:" "$skill_md" 2>/dev/null | grep "category:" | head -n 1 | awk -F': ' '{print $2}' | tr -d ' "\r\n')
+        if [ -n "$parsed_cat" ]; then
+            category="$parsed_cat"
+        fi
+    fi
+    echo "$category"
+}
+
 # Parse options
 FORCE=false
 DEST_INPUT=""
@@ -84,7 +99,8 @@ DEST_DIR="${DEST_INPUT/#\~/$HOME}"
 # Check for existing folder conflicts
 CONFLICTING_SKILLS=()
 for skill in "${SKILLS[@]}"; do
-    if [ -d "$DEST_DIR/$skill" ]; then
+    CATEGORY=$(get_skill_category "$SKILLS_SOURCE_DIR/$skill")
+    if [ -d "$DEST_DIR/$CATEGORY/$skill" ]; then
         CONFLICTING_SKILLS+=("$skill")
     fi
 done
@@ -95,7 +111,8 @@ if [ ${#CONFLICTING_SKILLS[@]} -gt 0 ]; then
         echo "----------------------------------------------------------"
         echo "ERROR: Installation aborted. The following skills already exist at target:"
         for skill in "${CONFLICTING_SKILLS[@]}"; do
-            echo "  - $DEST_DIR/$skill"
+            CATEGORY=$(get_skill_category "$SKILLS_SOURCE_DIR/$skill")
+            echo "  - $DEST_DIR/$CATEGORY/$skill"
         done
         echo "----------------------------------------------------------"
         echo "Tip: Run the script with --force to overwrite existing directories:"
@@ -118,13 +135,17 @@ fi
 # Copying skills
 echo "Copying skills to $DEST_DIR..."
 for skill in "${SKILLS[@]}"; do
+    CATEGORY=$(get_skill_category "$SKILLS_SOURCE_DIR/$skill")
+    TARGET_SKILL_DIR="$DEST_DIR/$CATEGORY/$skill"
+    
     # Remove existing folder if force copying
-    if [ -d "$DEST_DIR/$skill" ]; then
-        rm -rf "$DEST_DIR/$skill"
+    if [ -d "$TARGET_SKILL_DIR" ]; then
+        rm -rf "$TARGET_SKILL_DIR"
     fi
     
-    cp -r "$SKILLS_SOURCE_DIR/$skill" "$DEST_DIR/"
-    echo "  [ OK ] $skill copied successfully."
+    mkdir -p "$DEST_DIR/$CATEGORY"
+    cp -r "$SKILLS_SOURCE_DIR/$skill" "$DEST_DIR/$CATEGORY/"
+    echo "  [ OK ] $skill copied successfully to category '$CATEGORY'."
 done
 
 echo "----------------------------------------------------------"
