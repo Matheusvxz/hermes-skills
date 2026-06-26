@@ -22,7 +22,9 @@ metadata:
 Control and retrieve status of a Sonoff Mini smart switch running in DIY mode on the local network via HTTP POST requests.
 
 ## When to Use
+
 Use this skill when you need to:
+
 - Turn a Sonoff Mini smart switch ON or OFF.
 - Check the current power state, startup behavior, or signal strength (RSSI) of a device.
 - List all configured Sonoff Mini devices on the local network.
@@ -31,14 +33,16 @@ Use this skill when you need to:
 Do NOT use this skill if the device is connected to the eWeLink cloud or is not configured in DIY mode (listening on local network port 8081).
 
 ## Quick Reference
-| Action | Command | Expected Output |
-| --- | --- | --- |
-| Get Device Info | `bash sonoff_control.sh --ip <ip> info` | JSON with relay status, startup behavior, RSSI |
-| Turn ON Switch | `bash sonoff_control.sh switch on` | JSON confirming relay is `on` |
-| Turn OFF Switch | `bash sonoff_control.sh switch off` | JSON confirming relay is `off` |
-| List Devices | `bash list_devices.sh` | JSON array of all configured devices |
+
+| Action          | Command                                                  | Expected Output                                |
+| --------------- | -------------------------------------------------------- | ---------------------------------------------- |
+| Get Device Info | `bash scripts/sonoff_control.sh --ip <ip> info`           | JSON with relay status, startup behavior, RSSI |
+| Turn ON Switch  | `bash scripts/sonoff_control.sh switch on`               | JSON confirming relay is `on` (uses saved IP)  |
+| Turn OFF Switch | `bash scripts/sonoff_control.sh switch off`              | JSON confirming relay is `off` (uses saved IP) |
+| List Devices    | `bash scripts/list_devices.sh`                           | JSON array of all configured devices           |
 
 ## Procedure
+
 To execute Sonoff Mini controls, follow these steps using the `terminal` tool:
 
 1. **Hermes Sandbox Script Materialization (Docker/Modal backends):**
@@ -50,28 +54,42 @@ To execute Sonoff Mini controls, follow these steps using the `terminal` tool:
    - For all subsequent executions, run commands from the materialized path (e.g., `bash /workspace/.hermes/skills/sonoff-mini/scripts/sonoff_control.sh`).
 
 2. **Initial Configuration:**
-   - Supply the device IP and name on the first invocation to auto-save the configuration:
+   - Supply the device IP and name on the first invocation to auto-save the configuration (the name defaults to "Sonoff Mini" if not specified):
      ```bash
-     bash sonoff_control.sh --ip 192.168.1.150 --name "Living Room Light" info
+     bash scripts/sonoff_control.sh --ip 192.168.1.150 --name "Living Room Light" info
      ```
    - To force reconfiguration:
      ```bash
-     bash sonoff_control.sh --ip 192.168.1.150 --name "Living Room Light" setup
+     bash scripts/sonoff_control.sh --ip 192.168.1.150 --name "Living Room Light" setup
      ```
 
 3. **General Control Commands:**
-   - **Info:** `bash sonoff_control.sh info` (reuses saved configuration).
-   - **Relay Control:** `bash sonoff_control.sh switch on` or `bash sonoff_control.sh switch off`.
-   - **List Configured Devices:** `bash list_devices.sh`.
+   - **Info:** `bash scripts/sonoff_control.sh info` (reuses saved configuration).
+   - **Relay Control:** 
+     - To control the saved/configured device:
+       ```bash
+       bash scripts/sonoff_control.sh switch on
+       bash scripts/sonoff_control.sh switch off
+       ```
+     - To control a specific device and save it as the default configuration:
+       ```bash
+       bash scripts/sonoff_control.sh --ip 192.168.1.150 --name "Living Room Light" switch on
+       ```
+     > [!IMPORTANT]
+     > The scripts do not support filtering or targeting a device by passing only `--name <label>` without an `--ip`. To control a device, you must either use the currently saved active configuration (by omitting `--ip`), or pass `--ip` directly.
+   - **List Configured Devices:** `bash scripts/list_devices.sh`.
 
 ## Pitfalls
+
 - **DIY Mode Inactive:** If the physical relay is connected to the eWeLink cloud, the local HTTP API (port 8081) is disabled. Press and hold the physical button on the switch for 5 seconds to toggle DIY mode.
 - **Docker Sandbox Network Limits:** The terminal sandbox running inside Docker might not reach local LAN IP addresses (like `192.168.x.x`). If command queries time out, you must execute the scripts directly on the host machine.
 - **Dependency Fallback:** If `jq` is not installed, scripts fall back to `sed` for parsing, but output validation is more robust when `jq` is present.
 - **Missing Materialization:** Failing to copy the scripts to `/workspace` before invoking them inside a Docker backend will cause `No such file or directory` errors.
 
 ## Verification
+
 Validate that commands executed successfully by checking the stdout JSON response:
+
 - A successful command returns `"status": "success"` and the corresponding action details.
 - To verify a switch state change, ensure `"state"` matches your target command (`"on"` or `"off"`).
 - All command schemas are strictly defined in `references/api-contract.md`.
