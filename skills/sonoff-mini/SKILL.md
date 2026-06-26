@@ -2,7 +2,7 @@
 name: sonoff-mini
 description: Control Sonoff Mini smart switches in DIY mode locally.
 author: Matheusvxz
-version: 2.0.0
+version: 2.0.1
 license: MIT
 supporting_files:
   scripts:
@@ -34,12 +34,12 @@ Do NOT use this skill if the device is connected to the eWeLink cloud or is not 
 
 ## Quick Reference
 
-| Action          | Command                                                  | Expected Output                                |
-| --------------- | -------------------------------------------------------- | ---------------------------------------------- |
-| Get Device Info | `bash scripts/sonoff_control.sh --ip <ip> info`           | JSON with relay status, startup behavior, RSSI |
-| Turn ON Switch  | `bash scripts/sonoff_control.sh switch on`               | JSON confirming relay is `on` (uses saved IP)  |
-| Turn OFF Switch | `bash scripts/sonoff_control.sh switch off`              | JSON confirming relay is `off` (uses saved IP) |
-| List Devices    | `bash scripts/list_devices.sh`                           | JSON array of all configured devices           |
+| Action          | Command                                         | Expected Output                                |
+| --------------- | ----------------------------------------------- | ---------------------------------------------- |
+| Get Device Info | `bash scripts/sonoff_control.sh --ip <ip> info` | JSON with relay status, startup behavior, RSSI |
+| Turn ON Switch  | `bash scripts/sonoff_control.sh switch on`      | JSON confirming relay is `on` (uses saved IP)  |
+| Turn OFF Switch | `bash scripts/sonoff_control.sh switch off`     | JSON confirming relay is `off` (uses saved IP) |
+| List Devices    | `bash scripts/list_devices.sh`                  | JSON array of all configured devices           |
 
 ## Procedure
 
@@ -65,7 +65,7 @@ To execute Sonoff Mini controls, follow these steps using the `terminal` tool:
 
 3. **General Control Commands:**
    - **Info:** `bash scripts/sonoff_control.sh info` (reuses saved configuration).
-   - **Relay Control:** 
+   - **Relay Control:**
      - To control the saved/configured device:
        ```bash
        bash scripts/sonoff_control.sh switch on
@@ -75,8 +75,8 @@ To execute Sonoff Mini controls, follow these steps using the `terminal` tool:
        ```bash
        bash scripts/sonoff_control.sh --ip 192.168.1.150 --name "Living Room Light" switch on
        ```
-     > [!IMPORTANT]
-     > The scripts do not support filtering or targeting a device by passing only `--name <label>` without an `--ip`. To control a device, you must either use the currently saved active configuration (by omitting `--ip`), or pass `--ip` directly.
+       > [!IMPORTANT]
+       > The scripts do not support filtering or targeting a device by passing only `--name <label>` without an `--ip`. To control a device, you must either use the currently saved active configuration (by omitting `--ip`), or pass `--ip` directly.
    - **List Configured Devices:** `bash scripts/list_devices.sh`.
 
 ## Pitfalls
