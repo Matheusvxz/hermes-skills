@@ -96,7 +96,7 @@ validate_device() {
     local ip="$1"
     local response
     response=$(curl -s -X POST -H "Content-Type: application/json" \
-        -d '{"deviceid": "", "data": {}}' \
+        -d '{"data": {}}' \
         --connect-timeout 5 \
         "http://${ip}:8081/zeroconf/info" 2>/dev/null) || true
     if [ -z "$response" ]; then
@@ -146,7 +146,7 @@ cmd_info() {
 
     local response
     response=$(curl -s -X POST -H "Content-Type: application/json" \
-        -d '{"deviceid": "", "data": {}}' \
+        -d '{"data": {}}' \
         "http://${ip}:8081/zeroconf/info") || true
 
     if [ -z "$response" ]; then
@@ -178,7 +178,7 @@ cmd_switch() {
 
     local response
     response=$(curl -s -X POST -H "Content-Type: application/json" \
-        -d "{\"deviceid\": \"\", \"data\": {\"switch\": \"$state\"}}" \
+        -d "{\"data\": {\"switch\": \"$state\"}}" \
         "http://${ip}:8081/zeroconf/switch") || true
 
     if [ -z "$response" ]; then
